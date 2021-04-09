@@ -6,12 +6,18 @@
 #  Created by yanue on 2018/12/19.
 #  Copyright © 2018 yanue. All rights reserved.
 
-cd `dirname "${BASH_SOURCE[0]}"`
+cd ~/.V2rayU/
 
-cmd="../MacOS/V2rayUTool"
+cmd="./V2rayUTool"
 
 sudo chown root:admin ${cmd}
 sudo chmod a+rx ${cmd}
 sudo chmod +s ${cmd}
 
-echo done1
+cmd="./V2rayUHelper"
+
+sudo chown root:admin ${cmd}
+sudo chmod a+rx ${cmd}
+sudo chmod +s ${cmd}
+
+echo 'done'
