@@ -10,12 +10,15 @@ import Cocoa
 
 struct V2rayTransport: Codable {
     var tlsSettings: TlsSettings?
+    var xtlsSettings: TlsSettings?
+    var realitySettings: RealitySettings?
     var tcpSettings: TcpSettings?
     var kcpSettings: KcpSettings?
     var wsSettings: WsSettings?
     var httpSettings: HttpSettings?
     var dsSettings: DsSettings?
     var quicSettings: QuicSettings?
+    var grpcSettings: GrpcSettings?
 }
 
 struct V2rayStreamSettings: Codable {
@@ -27,31 +30,49 @@ struct V2rayStreamSettings: Codable {
         case h2
         case domainsocket
         case quic
+        case grpc
     }
 
     enum security: String, Codable {
         case none
         case tls
+        case xtls
+        case reality // for vless
     }
 
     var network: network = .tcp
     var security: security = .none
     var sockopt: V2rayStreamSettingSockopt?
-    var tlsSettings: TlsSettings?
+    // transport
     var tcpSettings: TcpSettings?
     var kcpSettings: KcpSettings?
     var wsSettings: WsSettings?
     var httpSettings: HttpSettings?
     var dsSettings: DsSettings?
     var quicSettings: QuicSettings?
+    var grpcSettings: GrpcSettings?
+    // security
+    var tlsSettings: TlsSettings?
+    var xtlsSettings: TlsSettings?
+    var realitySettings: RealitySettings?
 }
 
 struct TlsSettings: Codable {
-    var serverName: String?
-    var alpn: String?
-    var allowInsecure: Bool?
+    var serverName: String = ""
+    var allowInsecure: Bool = true
     var allowInsecureCiphers: Bool?
     var certificates: TlsCertificates?
+    var alpn: String?
+    var fingerprint: String = "chrome" // 必填，使用 tls 库模拟客户端 TLS 指纹
+}
+
+struct RealitySettings: Codable {
+    var show: Bool = true  // 选填，若为 true，输出调试信息
+    var fingerprint: String = "chrome" // 必填，使用 uTLS 库模拟客户端 TLS 指纹
+    var serverName: String = "" // 服务端 serverNames 之一
+    var publicKey: String = "" // 服务端私钥对应的公钥
+    var shortId: String = "" // 服务端 shortIds 之一
+    var spiderX: String = "" // 爬虫初始路径与参数，建议每个客户端不同
 }
 
 struct TlsCertificates: Codable {
@@ -73,24 +94,24 @@ struct TcpSettings: Codable {
 }
 
 struct TcpSettingHeader: Codable {
-    var type: String = "none"
+    var type: String = "none" // http or none
     var request: TcpSettingHeaderRequest?
     var response: TcpSettingHeaderResponse?
 }
 
 struct TcpSettingHeaderRequest: Codable {
-    var version: String = ""
-    var method: String = ""
-    var path: [String] = []
+    var version: String = "1.1"
+    var method: String = "GET"
+    var path: [String] = [""]
     var headers: TcpSettingHeaderRequestHeaders = TcpSettingHeaderRequestHeaders()
 }
 
 struct TcpSettingHeaderRequestHeaders: Codable {
     var host: [String] = []
-    var userAgent: [String] = []
-    var acceptEncoding: [String] = []
-    var connection: [String] = []
-    var pragma: String = ""
+    var userAgent: [String] = ["Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"]
+    var acceptEncoding: [String] = ["gzip", "deflate"]
+    var connection: [String] = ["keep-alive"]
+    var pragma: String? = "no-cache"
 
     enum CodingKeys: String, CodingKey {
         case host = "Host"
@@ -126,6 +147,7 @@ struct KcpSettings: Codable {
     var congestion: Bool = false
     var readBufferSize: Int = 1
     var writeBufferSize: Int = 1
+    var seed:String = ""
     var header: KcpSettingsHeader = KcpSettingsHeader()
 }
 
@@ -181,4 +203,15 @@ var QuicSettingsHeaderType = ["none", "srtp", "utp", "wechat-video", "dtls", "wi
 struct QuicSettingHeader: Codable {
     // QuicSettingsHeaderType
     var type: String = "none"
+}
+
+struct GrpcSettings: Codable {
+    var authority: String?
+    var serviceName: String = ""
+    var multiMode: Bool = false
+    var user_agent: String?
+    var idle_timeout: Int = 60
+    var health_check_timeout: Int = 60
+    var permit_without_stream: Bool = false
+    var initial_windows_size: Int = 0
 }

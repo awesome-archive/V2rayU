@@ -7,32 +7,66 @@ BASE_DIR=$HOME/swift/V2rayU
 BUILD_DIR=${BASE_DIR}/Build
 V2rayU_ARCHIVE=${BUILD_DIR}/V2rayU.xcarchive
 V2rayU_RELEASE=${BUILD_DIR}/release
-APP_Version=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "${BASE_DIR}/${APP_NAME}/${INFOPLIST_FILE}")
+APP_Version=$(sed -n '/MARKETING_VERSION/{s/MARKETING_VERSION = //;s/;//;s/^[[:space:]]*//;p;q;}' ../V2rayU.xcodeproj/project.pbxproj)
 DMG_FINAL="${APP_NAME}.dmg"
 APP_TITLE="${APP_NAME} - V${APP_Version}"
 AppCastDir=$HOME/swift/appcast
 
 function updatePlistVersion() {
+    echo "Updating plist version..."
     buildString=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "${BASE_DIR}/V2rayU/${INFOPLIST_FILE}")
-    /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $buildString" "${BASE_DIR}/V2rayU/${INFOPLIST_FILE}"
+    if [ $? -eq 0 ]; then
+        /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $buildString" "${BASE_DIR}/V2rayU/${INFOPLIST_FILE}"
+        if [ $? -ne 0 ]; then
+            echo "Error: Failed to set CFBundleVersion"
+            exit 1
+        fi
+    else
+        echo "Error: Failed to read CFBundleShortVersionString"
+        exit 1
+    fi
 }
 
 function build() {
-    echo "Building V2rayU."${APP_Version}
+    echo "Building V2rayU version ${APP_Version}"
+    
     echo "Cleaning up old archive & app..."
     rm -rf ${V2rayU_ARCHIVE} ${V2rayU_RELEASE}
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to clean up old archive & app"
+        exit 1
+    fi
 
     echo "Building archive... please wait a minute"
     xcodebuild -workspace ${BASE_DIR}/V2rayU.xcworkspace -config Release -scheme V2rayU -archivePath ${V2rayU_ARCHIVE} archive
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to build archive"
+        exit 1
+    fi
 
     echo "Exporting archive..."
     xcodebuild -archivePath ${V2rayU_ARCHIVE} -exportArchive -exportPath ${V2rayU_RELEASE} -exportOptionsPlist ./build.plist
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to export archive"
+        exit 1
+    fi
 
     echo "Cleaning up archive..."
     rm -rf ${V2rayU_ARCHIVE}
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to clean up archive"
+        exit 1
+    fi
 
+    echo "Setting permissions for resources..."
     chmod -R 755 "${V2rayU_RELEASE}/${APP_NAME}.app/Contents/Resources/v2ray-core"
     chmod -R 755 "${V2rayU_RELEASE}/${APP_NAME}.app/Contents/Resources/unzip.sh"
+    if [ $? -ne 0 ]; then
+        echo "Error: Failed to set permissions for resources"
+        exit 1
+    fi
+
+    echo "Build and export completed successfully."
 }
 
 function createDmg() {
@@ -111,9 +145,10 @@ function generateAppcast() {
     if [[ -z "$description" ]]; then
         description="bug fix"
     fi
-    downloadUrl="https://github.com/yanue/V2rayU/releases/download/${APP_Version}/V2rayU.dmg"
+    downloadUrl="https://github.com/yanue/V2rayU/releases/download/${APP_Version}/V2rayU-64.dmg"
     # https://github.com/c9s/appcast.git
     ${AppCastDir}/appcast -append\
+        -dsaSignature="PW8pDnr5VZkmC93gZjUDlHI8gkJSspPoDU3DdhsMkps"\
         -title="${APP_TITLE}"\
         -description="${description}"\
         -file "${DMG_FINAL}"\
@@ -130,7 +165,9 @@ function pushRelease() {
     fi
 
     echo "github-release tag"
+        
     ${AppCastDir}/github-release release\
+        --security-token ="f4ff9dc62cdf998cd57f22be811c6df6e2a58050"\
         --user "yanue"\
         --repo "${APP_NAME}"\
         --tag "${APP_Version}"\
@@ -139,6 +176,7 @@ function pushRelease() {
 
     echo "github-release upload"
     ${AppCastDir}/github-release upload\
+        --security-token "f4ff9dc62cdf998cd57f22be811c6df6e2a58050"\
         --user "yanue"\
         --repo "${APP_NAME}"\
         --tag "${APP_Version}"\
@@ -162,18 +200,51 @@ function commit() {
 }
 
 function downloadV2ray() {
-    echo "正在查询最新版v2ray ..."
-    rm -fr v2ray-macos.zip v2ray-core
-    tag=$(curl --silent "https://api.github.com/repos/v2ray/v2ray-core/releases/latest" | grep '"tag_name":' | sed -E 's/.*"([^"]+)".*/\1/')
+    DMG_FINAL="${APP_NAME}-64.dmg"
+    rm -fr ${DMG_FINAL} ${V2rayU_RELEASE}
+    
+    echo "正在查询最新版v2ray-64 ..."
+    rm -fr v2ray-core
+    tag='v1.5.9'
     echo "v2ray-core version: ${tag}"
-    url="https://github.com/v2ray/v2ray-core/releases/download/${tag}/v2ray-macos.zip"
+    url="https://github.com/XTLS/Xray-core/releases/download/v1.5.9/Xray-macos-64.zip"
     echo "正在下载最新版v2ray: ${tag}"
-    curl -Lo v2ray-macos.zip ${url}
+    curl -Lo Xray-macos-64.zip ${url}
 
-    unzip -o v2ray-macos.zip -d v2ray-core
-    rm -fr v2ray-macos.zip
+    unzip -o Xray-macos-64.zip -d v2ray-core
+    \cp v2ray-core/xray v2ray-core/v2ray
 }
 
+function downloadV2rayArm() {
+    DMG_FINAL="${APP_NAME}-arm64.dmg"
+    rm -fr ${DMG_FINAL} ${V2rayU_RELEASE}
+
+    echo "正在查询最新版v2ray-arm64 ..."
+    rm -fr v2ray-core
+    tag='v1.5.9'
+    echo "v2ray-core version: ${tag}"
+    url="https://github.com/XTLS/Xray-core/releases/download/v1.5.9/Xray-macos-arm64-v8a.zip"
+    echo "正在下载最新版v2ray: ${tag}"
+    curl -Lo Xray-macos-arm64-v8a.zip ${url}
+
+    unzip -o Xray-macos-arm64-v8a.zip -d v2ray-core
+    \cp v2ray-core/xray v2ray-core/v2ray
+}
+
+function createDmgByAppdmg() {
+#    umount "/Volumes/${APP_NAME}"
+
+#    rm -rf ${BUILD_DIR}/${APP_NAME}.app ${BUILD_DIR}/${DMG_FINAL}
+#    \cp -Rf "${V2rayU_RELEASE}/${APP_NAME}.app" "${BUILD_DIR}/${APP_NAME}.app"
+
+    rm -f  ${BUILD_DIR}/${DMG_FINAL}
+    # https://github.com/LinusU/node-appdmg
+    # npm install -g appdmg
+    echo ${BUILD_DIR}/appdmg.json
+    appdmg appdmg.json ${DMG_FINAL}
+
+#    umount "/Volumes/${APP_NAME}"
+}
 
 function makeDmg() {
     echo "正在打包版本: V"${APP_Version}
@@ -190,28 +261,33 @@ function makeDmg() {
     echo "请输入Y|N"
     exit;;
     esac
+    echo "请选择build的版本 :"
+    options=("64" "arm64")
+    select target in "${options[@]}"
+    do
+        case $target in
+        "64")
+            echo "你选择了: 64"
+#            downloadV2ray
+            cd release/
+            break
+            ;;
+        "arm64")
+            echo "你选择了: arm64"
+#            downloadV2rayArm
+            break
+            ;;
+        *) echo "请选择";;
+        esac
+    done
 
-    rm -fr ${DMG_FINAL} ${V2rayU_RELEASE}
-    updatePlistVersion
-    downloadV2ray
-    build
-    createDmg
+#    updatePlistVersion
+#    build
+    createDmgByAppdmg
 }
 
-function publish() {
-    read -p "请输入版本描述: " release_note
-    pushRelease ${release_note}
-    generateAppcast ${release_note}
-    commit
 
-    rm -rf "${DMG_TMP}" "${APP_PATH}" "${V2rayU_RELEASE}"
-    echo "Done"
-}
+#makeDmg
+createDmgByAppdmg
 
-
-if [ "$1" = "publish" ]
-then
-    publish
-else
-    makeDmg
-fi
+echo 'done'

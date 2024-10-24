@@ -15,13 +15,9 @@ struct V2rayStruct: Codable {
     var api: V2rayApi?
     var dns: V2rayDns = V2rayDns()
     var stats: V2rayStats?
-    var routing: V2rayRouting? = V2rayRouting()
+    var routing: V2rayRouting = V2rayRouting()
     var policy: V2rayPolicy?
-    var inbound: V2rayInbound?
-    var inboundDetour: [V2rayInbound]?
     var inbounds: [V2rayInbound]? // > 4.0
-    var outbound: V2rayOutbound?
-    var outboundDetour: [V2rayOutbound]?
     var outbounds: [V2rayOutbound]? // > 4.0
     var transport: V2rayTransport?
 }
@@ -32,6 +28,8 @@ enum V2rayProtocolInbound: String, CaseIterable, Codable {
     case shadowsocks
     case socks
     case vmess
+    case vless
+    case trojan
 }
 
 // log
@@ -54,7 +52,7 @@ struct V2rayApi: Codable {
 }
 
 struct V2rayDns: Codable {
-    var servers: [String] = ["1.1.1.1", "8.8.8.8", "8.8.4.4", "119.29.29.29", "114.114.114.114", "223.5.5.5", "223.6.6.6"]
+    var servers: [String]?
 }
 
 struct V2rayStats: Codable {
@@ -62,32 +60,47 @@ struct V2rayStats: Codable {
 }
 
 struct V2rayRouting: Codable {
-    var strategy: String = "rules"
-    var settings: V2rayRoutingSetting = V2rayRoutingSetting()
-}
-
-struct V2rayRoutingSetting: Codable {
     enum domainStrategy: String, Codable {
         case AsIs
         case IPIfNonMatch
         case IPOnDemand
     }
-
-    var domainStrategy: domainStrategy = .IPIfNonMatch
-    var rules: [V2rayRoutingSettingRule] = [V2rayRoutingSettingRule()]
+    enum domainMatcher: String, Codable {
+        case hybrid
+        case linear
+    }
+    
+    var domainStrategy: domainStrategy = .AsIs
+    var domainMatcher: domainMatcher?
+    var rules: [V2rayRoutingRule] = []
+    var balancers: [V2rayRoutingBalancer]? = []
 }
 
-struct V2rayRoutingSettingRule: Codable {
-    var type: String? = "field"
-    var domain: [String]? = ["geosite:cn", "geosite:speedtest"]
-    var ip: [String]? = ["geoip:cn", "geoip:private"]
+struct V2rayRoutingRule: Codable {
+    var domainMatcher: String?
+    var type: String = "field"
+    var domain: [String]? = []
+    var ip: [String]? = []
     var port: String?
+    var sourcePort: String?
     var network: String?
     var source: [String]?
     var user: [String]?
     var inboundTag: [String]?
     var `protocol`: [String]? // ["http", "tls", "bittorrent"]
     var outboundTag: String? = "direct"
+    var balancerTag: String?
+}
+
+struct V2rayRoutingBalancer: Codable {
+    var selector: [String]?
+    var strategy: V2rayRoutingBalancerStrategy?
+    var tag: String?
+    var fallbackTag: String?
+}
+
+struct V2rayRoutingBalancerStrategy: Codable {
+    var type: String? // type : "random" | "roundRobin" | "leastPing" | "leastLoad"
 }
 
 struct V2rayPolicy: Codable {
